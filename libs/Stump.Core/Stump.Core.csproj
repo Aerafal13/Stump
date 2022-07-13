@@ -11,6 +11,7 @@
 
 	<ItemGroup>
 	  <PackageReference Include="NLog" Version="5.0.0-rc2" />
+	  <PackageReference Include="System.ServiceModel.Primitives" Version="4.9.0" />
 	  <PackageReference Include="zlib.net-mutliplatform" Version="1.0.6" />
 	</ItemGroup>
 
