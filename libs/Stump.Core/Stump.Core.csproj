@@ -6,6 +6,12 @@
 		<Nullable>enable</Nullable>
 		<LangVersion>preview</LangVersion>
 		<EnablePreviewFeatures>true</EnablePreviewFeatures>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="NLog" Version="5.0.0-rc2" />
+	  <PackageReference Include="zlib.net-mutliplatform" Version="1.0.6" />
+	</ItemGroup>
 
 </Project>
