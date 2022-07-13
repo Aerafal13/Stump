@@ -26,7 +26,7 @@
 | [Stump.Core][core] | [Stump.Servers.BaseServer][base] |
 | [Stump.ORM][orm] | [Stump.Servers.AuthServer][auth] |
 | [Stump.Protocol][protocol] | [Stump.Servers.WorldServer][world] |
-| [Stump.Tools][tools] |
+| [Stump.Tools][tools] | [Stump.Servers.HaapiServer][world] |
 
 ## Changelog
 [Learn about the latest improvements][changelog]
