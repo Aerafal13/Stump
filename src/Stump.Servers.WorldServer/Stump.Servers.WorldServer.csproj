@@ -13,4 +13,18 @@
 	  <ProjectReference Include="..\Stump.Servers.BaseServer\Stump.Servers.BaseServer.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Commands\Matching\Items\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="ServiceStack" Version="6.1.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Reference Include="TreeSharp.Portable">
+	    <HintPath>..\..\..\treesharp\TreeSharp.Portable\bin\Debug\netstandard2.0\TreeSharp.Portable.dll</HintPath>
+	  </Reference>
+	</ItemGroup>
+
 </Project>
