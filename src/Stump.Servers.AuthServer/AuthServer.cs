@@ -1,12 +1,6 @@
-﻿
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using System.Threading.Tasks;
 using Stump.Core.Attributes;
 using Stump.Core.Threading;
 using Stump.DofusProtocol.Messages;
@@ -45,7 +39,7 @@ namespace Stump.Server.AuthServer
         /// Server port
         /// </summary>
         [Variable]
-        public static readonly int Port = 443;
+        public static readonly int Port = 446;
 
         [Variable]
         public static string IpcAddress = "localhost";
@@ -182,7 +176,8 @@ namespace Stump.Server.AuthServer
 
         protected override void OnShutdown()
         {
-            DBAccessor.CloseConnection();
+            if (DBAccessor.Database != null)
+                DBAccessor.CloseConnection();
         }
 
         protected override BaseClient CreateClient(Socket s)
