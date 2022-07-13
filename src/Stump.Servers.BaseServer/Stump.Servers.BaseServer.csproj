@@ -8,4 +8,8 @@
 		<EnablePreviewFeatures>true</EnablePreviewFeatures>
 	</PropertyGroup>
 
+	<ItemGroup>
+	  <ProjectReference Include="..\..\libs\Stump.Tools\Stump.Tools.csproj" />
+	</ItemGroup>
+
 </Project>
