@@ -10,17 +10,15 @@
 
 // Define PETAPOCO_NO_DYNAMIC in your project settings on .NET 3.5
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Configuration;
-using System.Data.Common;
 using System.Data;
-using System.Text.RegularExpressions;
+using System.Data.Common;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Linq.Expressions;
+using System.Text;
+using System.Text.RegularExpressions;
+using MySql.Data.MySqlClient;
 using Stump.ORM.SubSonic.SQLGeneration.Schema;
 
 namespace Stump.ORM
@@ -51,7 +49,7 @@ namespace Stump.ORM
 	{
 		public ResultColumnAttribute(string name) : base(name) { }
 	}
-    /*
+	/*
 	// Specify the table name of a poco
 	[AttributeUsage(AttributeTargets.Class)]
 	public class TableNameAttribute : Attribute
@@ -85,7 +83,7 @@ namespace Stump.ORM
 	}
 
 	// Results from paged request
-	public class Page<T> 
+	public class Page<T>
 	{
 		public long CurrentPage { get; set; }
 		public long TotalPages { get; set; }
@@ -136,7 +134,7 @@ namespace Stump.ORM
 		{
 			_sharedConnection = connection;
 			_connectionString = connection.ConnectionString;
-			_sharedConnectionDepth = 2;		// Prevent closing external connection
+			_sharedConnectionDepth = 2;     // Prevent closing external connection
 			CommonConstruct();
 		}
 
@@ -185,7 +183,7 @@ namespace Stump.ORM
 			MySql,
 			PostgreSQL,
 			Oracle,
-            SQLite
+			SQLite
 		}
 		DBType _dbType = DBType.SqlServer;
 
@@ -198,7 +196,7 @@ namespace Stump.ORM
 			ForceDateTimesToUtc = true;
 
 			if (_providerName != null)
-				_factory = DbProviderFactories.GetFactory(_providerName);
+				_factory = MySqlClientFactory.Instance;
 
 			string dbtype = (_factory == null ? _sharedConnection.GetType() : _factory.GetType()).Name;
 
@@ -245,7 +243,7 @@ namespace Stump.ORM
 				_sharedConnection = OnConnectionOpened(_sharedConnection);
 
 				if (KeepConnectionAlive)
-					_sharedConnectionDepth++;		// Make sure you call Dispose
+					_sharedConnectionDepth++;       // Make sure you call Dispose
 			}
 			_sharedConnectionDepth++;
 		}
@@ -368,8 +366,8 @@ namespace Stump.ORM
 				}
 
 				// Expand collections to parameter lists
-				if ((arg_val as System.Collections.IEnumerable) != null && 
-					(arg_val as string) == null && 
+				if ((arg_val as System.Collections.IEnumerable) != null &&
+					(arg_val as string) == null &&
 					(arg_val as byte[]) == null)
 				{
 					var sb = new StringBuilder();
@@ -393,10 +391,10 @@ namespace Stump.ORM
 		void AddParam(IDbCommand cmd, object item, string ParameterPrefix)
 		{
 			// Convert value to from poco type to db type
-			if (Database.Mapper != null && item!=null)
+			if (Database.Mapper != null && item != null)
 			{
 				var fn = Database.Mapper.GetToDbConverter(item.GetType());
-				if (fn!=null)
+				if (fn != null)
 					item = fn(item);
 			}
 
@@ -418,7 +416,7 @@ namespace Stump.ORM
 			else
 			{
 				var t = item.GetType();
-				if (t.IsEnum)		// PostgreSQL .NET driver wont cast enum to int
+				if (t.IsEnum)       // PostgreSQL .NET driver wont cast enum to int
 				{
 					p.Value = (int)item;
 				}
@@ -430,7 +428,7 @@ namespace Stump.ORM
 				}
 				else if (t == typeof(string))
 				{
-					p.Size = Math.Max((item as string).Length + 1, 4000);		// Help query plan caching by using common size
+					p.Size = Math.Max((item as string).Length + 1, 4000);       // Help query plan caching by using common size
 					p.Value = item;
 				}
 				else if (t == typeof(AnsiString))
@@ -479,7 +477,7 @@ namespace Stump.ORM
 			// Perform parameter prefix replacements
 			if (_paramPrefix != "@")
 				sql = rxParamsPrefix.Replace(sql, m => _paramPrefix + m.Value.Substring(1));
-			sql = sql.Replace("@@", "@");		   // <- double @@ escapes a single @
+			sql = sql.Replace("@@", "@");          // <- double @@ escapes a single @
 
 			// Create the command and add parameters
 			IDbCommand cmd = connection.CreateCommand();
@@ -512,20 +510,21 @@ namespace Stump.ORM
 		// Override this to log commands, or modify command before execution
 		public virtual IDbConnection OnConnectionOpened(IDbConnection conn) { return conn; }
 		public virtual void OnConnectionClosing(IDbConnection conn) { }
-		public virtual void OnExecutingCommand(IDbCommand cmd) {		    
-            var evnt = ExecutingCommand;
-            if (evnt != null)
-                evnt(this, cmd); 
-        }
+		public virtual void OnExecutingCommand(IDbCommand cmd)
+		{
+			var evnt = ExecutingCommand;
+			if (evnt != null)
+				evnt(this, cmd);
+		}
 		public virtual void OnExecutedCommand(IDbCommand cmd)
 		{
-		    var evnt = CommandExecuted;
-            if (evnt != null)
-                evnt(this, cmd);
+			var evnt = CommandExecuted;
+			if (evnt != null)
+				evnt(this, cmd);
 		}
-        
-	    public event Action<Database, IDbCommand> ExecutingCommand;
-	    public event Action<Database, IDbCommand> CommandExecuted;
+
+		public event Action<Database, IDbCommand> ExecutingCommand;
+		public event Action<Database, IDbCommand> CommandExecuted;
 
 		// Execute a non-query command
 		public int Execute(string sql, params object[] args)
@@ -537,7 +536,7 @@ namespace Stump.ORM
 				{
 					using (var cmd = CreateCommand(_sharedConnection, sql, args))
 					{
-						var retv=cmd.ExecuteNonQuery();
+						var retv = cmd.ExecuteNonQuery();
 						OnExecutedCommand(cmd);
 						return retv;
 					}
@@ -616,12 +615,12 @@ namespace Stump.ORM
 		public bool ForceDateTimesToUtc { get; set; }
 
 		// Return a typed list of pocos
-		public List<T> Fetch<T>(string sql, params object[] args) 
+		public List<T> Fetch<T>(string sql, params object[] args)
 		{
 			return Query<T>(sql, args).ToList();
 		}
 
-		public List<T> Fetch<T>(Sql sql) 
+		public List<T> Fetch<T>(Sql sql)
 		{
 			return Fetch<T>(sql.SQL, sql.Arguments);
 		}
@@ -666,7 +665,7 @@ namespace Stump.ORM
 			return true;
 		}
 
-		public void BuildPageQueries<T>(long skip, long take, string sql, ref object[] args, out string sqlCount, out string sqlPage) 
+		public void BuildPageQueries<T>(long skip, long take, string sql, ref object[] args, out string sqlCount, out string sqlPage)
 		{
 			// Add auto select clause
 			if (EnableAutoSelect)
@@ -677,7 +676,7 @@ namespace Stump.ORM
 			if (!SplitSqlForPaging(sql, out sqlCount, out sqlSelectRemoved, out sqlOrderBy))
 				throw new Exception("Unable to parse SQL statement for paged query");
 			if (_dbType == DBType.Oracle && sqlSelectRemoved.StartsWith("*"))
-                throw new Exception("Query must alias '*' when performing a paged query.\neg. select t.* from table t order by t.id");
+				throw new Exception("Query must alias '*' when performing a paged query.\neg. select t.* from table t order by t.id");
 
 			// Build the SQL for the actual final result
 			if (_dbType == DBType.SqlServer || _dbType == DBType.Oracle)
@@ -688,8 +687,8 @@ namespace Stump.ORM
 					sqlSelectRemoved = "peta_inner.* FROM (SELECT " + sqlSelectRemoved + ") peta_inner";
 				}
 				sqlPage = string.Format("SELECT * FROM (SELECT ROW_NUMBER() OVER ({0}) peta_rn, {1}) peta_paged WHERE peta_rn>@{2} AND peta_rn<=@{3}",
-										sqlOrderBy==null ? "ORDER BY (SELECT NULL)" : sqlOrderBy, sqlSelectRemoved, args.Length, args.Length + 1);
-				args = args.Concat(new object[] { skip, skip+take }).ToArray();
+										sqlOrderBy == null ? "ORDER BY (SELECT NULL)" : sqlOrderBy, sqlSelectRemoved, args.Length, args.Length + 1);
+				args = args.Concat(new object[] { skip, skip + take }).ToArray();
 			}
 			else if (_dbType == DBType.SqlServerCE)
 			{
@@ -705,10 +704,10 @@ namespace Stump.ORM
 		}
 
 		// Fetch a page	
-		public Page<T> Page<T>(long page, long itemsPerPage, string sql, params object[] args) 
+		public Page<T> Page<T>(long page, long itemsPerPage, string sql, params object[] args)
 		{
 			string sqlCount, sqlPage;
-			BuildPageQueries<T>((page-1)*itemsPerPage, itemsPerPage, sql, ref args, out sqlCount, out sqlPage);
+			BuildPageQueries<T>((page - 1) * itemsPerPage, itemsPerPage, sql, ref args, out sqlCount, out sqlPage);
 
 			// Save the one-time command time out and use it for both queries
 			int saveTimeout = OneTimeCommandTimeout;
@@ -731,7 +730,7 @@ namespace Stump.ORM
 			return result;
 		}
 
-		public Page<T> Page<T>(long page, long itemsPerPage, Sql sql) 
+		public Page<T> Page<T>(long page, long itemsPerPage, Sql sql)
 		{
 			return Page<T>(page, itemsPerPage, sql.SQL, sql.Arguments);
 		}
@@ -760,7 +759,7 @@ namespace Stump.ORM
 		}
 
 		// Return an enumerable collection of pocos
-		public IEnumerable<T> Query<T>(string sql, params object[] args) 
+		public IEnumerable<T> Query<T>(string sql, params object[] args)
 		{
 			if (EnableAutoSelect)
 				sql = AddSelectClause<T>(sql);
@@ -818,8 +817,8 @@ namespace Stump.ORM
 
 		// Multi Query
 		public IEnumerable<TRet> Query<T1, T2, TRet>(Func<T1, T2, TRet> cb, string sql, params object[] args) { return Query<TRet>(new Type[] { typeof(T1), typeof(T2) }, cb, sql, args); }
-		public IEnumerable<TRet> Query<T1, T2, T3, TRet>(Func<T1, T2, T3, TRet> cb, string sql, params object[] args) { return Query<TRet>(new Type[] { typeof(T1), typeof(T2), typeof(T3)}, cb, sql, args); }
-		public IEnumerable<TRet> Query<T1, T2, T3, T4, TRet>(Func<T1, T2, T3, T4, TRet> cb, string sql, params object[] args) { return Query<TRet>(new Type[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4)}, cb, sql, args); }
+		public IEnumerable<TRet> Query<T1, T2, T3, TRet>(Func<T1, T2, T3, TRet> cb, string sql, params object[] args) { return Query<TRet>(new Type[] { typeof(T1), typeof(T2), typeof(T3) }, cb, sql, args); }
+		public IEnumerable<TRet> Query<T1, T2, T3, T4, TRet>(Func<T1, T2, T3, T4, TRet> cb, string sql, params object[] args) { return Query<TRet>(new Type[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4) }, cb, sql, args); }
 
 		// Multi Fetch (SQL builder)
 		public List<TRet> Fetch<T1, T2, TRet>(Func<T1, T2, TRet> cb, Sql sql) { return Query<T1, T2, TRet>(cb, sql.SQL, sql.Arguments).ToList(); }
@@ -973,21 +972,21 @@ namespace Stump.ORM
 			// Call each delegate
 			var dels = new List<Delegate>();
 			int pos = 0;
-			for (int i=0; i<types.Length; i++)
+			for (int i = 0; i < types.Length; i++)
 			{
 				// Add to list of delegates to call
 				var del = FindSplitPoint(types[i], i + 1 < types.Length ? types[i + 1] : null, sql, r, ref pos);
 				dels.Add(del);
 
 				// Get the delegate
-				il.Emit(OpCodes.Ldarg_0);													// callback,this
-				il.Emit(OpCodes.Ldc_I4, i);													// callback,this,Index
-				il.Emit(OpCodes.Callvirt, typeof(MultiPocoFactory).GetMethod("GetItem"));	// callback,Delegate
-				il.Emit(OpCodes.Ldarg_1);													// callback,delegate, datareader
+				il.Emit(OpCodes.Ldarg_0);                                                   // callback,this
+				il.Emit(OpCodes.Ldc_I4, i);                                                 // callback,this,Index
+				il.Emit(OpCodes.Callvirt, typeof(MultiPocoFactory).GetMethod("GetItem"));   // callback,Delegate
+				il.Emit(OpCodes.Ldarg_1);                                                   // callback,delegate, datareader
 
 				// Call Invoke
 				var tDelInvoke = del.GetType().GetMethod("Invoke");
-				il.Emit(OpCodes.Callvirt, tDelInvoke);										// Poco left on stack
+				il.Emit(OpCodes.Callvirt, tDelInvoke);                                      // Poco left on stack
 			}
 
 			// By now we should have the callback and the N pocos all on the stack.  Call the callback and we're done
@@ -1077,7 +1076,7 @@ namespace Stump.ORM
 					var factory = GetMultiPocoFactory<TRet>(types, sql, r);
 					if (cb == null)
 						cb = GetAutoMapper(types.ToArray());
-					bool bNeedTerminator=false;
+					bool bNeedTerminator = false;
 					using (r)
 					{
 						while (true)
@@ -1117,54 +1116,54 @@ namespace Stump.ORM
 			}
 		}
 
-			
-		public IEnumerable<T> Query<T>(Sql sql) 
+
+		public IEnumerable<T> Query<T>(Sql sql)
 		{
 			return Query<T>(sql.SQL, sql.Arguments);
 		}
 
-		public bool Exists<T>(object primaryKey) 
+		public bool Exists<T>(object primaryKey)
 		{
 			return FirstOrDefault<T>(string.Format("WHERE {0}=@0", EscapeSqlIdentifier(PocoData.ForType(typeof(T)).TableInfo.PrimaryKey)), primaryKey) != null;
 		}
-		public T Single<T>(object primaryKey) 
+		public T Single<T>(object primaryKey)
 		{
 			return Single<T>(string.Format("WHERE {0}=@0", EscapeSqlIdentifier(PocoData.ForType(typeof(T)).TableInfo.PrimaryKey)), primaryKey);
 		}
-		public T SingleOrDefault<T>(object primaryKey) 
+		public T SingleOrDefault<T>(object primaryKey)
 		{
 			return SingleOrDefault<T>(string.Format("WHERE {0}=@0", EscapeSqlIdentifier(PocoData.ForType(typeof(T)).TableInfo.PrimaryKey)), primaryKey);
 		}
-		public T Single<T>(string sql, params object[] args) 
+		public T Single<T>(string sql, params object[] args)
 		{
 			return Query<T>(sql, args).Single();
 		}
-		public T SingleOrDefault<T>(string sql, params object[] args) 
+		public T SingleOrDefault<T>(string sql, params object[] args)
 		{
 			return Query<T>(sql, args).SingleOrDefault();
 		}
-		public T First<T>(string sql, params object[] args) 
+		public T First<T>(string sql, params object[] args)
 		{
 			return Query<T>(sql, args).First();
 		}
-		public T FirstOrDefault<T>(string sql, params object[] args) 
+		public T FirstOrDefault<T>(string sql, params object[] args)
 		{
 			return Query<T>(sql, args).FirstOrDefault();
 		}
 
-		public T Single<T>(Sql sql) 
+		public T Single<T>(Sql sql)
 		{
 			return Query<T>(sql).Single();
 		}
-		public T SingleOrDefault<T>(Sql sql) 
+		public T SingleOrDefault<T>(Sql sql)
 		{
 			return Query<T>(sql).SingleOrDefault();
 		}
-		public T First<T>(Sql sql) 
+		public T First<T>(Sql sql)
 		{
 			return Query<T>(sql).First();
 		}
-		public T FirstOrDefault<T>(Sql sql) 
+		public T FirstOrDefault<T>(Sql sql)
 		{
 			return Query<T>(sql).FirstOrDefault();
 		}
@@ -1214,8 +1213,8 @@ namespace Stump.ORM
 						var values = new List<string>();
 						var index = 0;
 
-                        if (poco is ISaveIntercepter)
-                            ( (ISaveIntercepter)poco ).BeforeSave(false);
+						if (poco is ISaveIntercepter)
+							((ISaveIntercepter)poco).BeforeSave(false);
 
 						foreach (var i in pd.Columns)
 						{
@@ -1224,7 +1223,7 @@ namespace Stump.ORM
 								continue;
 
 							// Don't insert the primary key (except under oracle where we need bring in the next sequence value)
-							if (autoIncrement && primaryKeyName != null && string.Compare(i.Key, primaryKeyName, true)==0)
+							if (autoIncrement && primaryKeyName != null && string.Compare(i.Key, primaryKeyName, true) == 0)
 							{
 								if (_dbType == DBType.Oracle && !string.IsNullOrEmpty(pd.TableInfo.SequenceName))
 								{
@@ -1252,7 +1251,7 @@ namespace Stump.ORM
 							OnExecutedCommand(cmd);
 							return true;
 						}
-                        
+
 
 						object id;
 						switch (_dbType)
@@ -1306,21 +1305,21 @@ namespace Stump.ORM
 								}
 								OnExecutedCommand(cmd);
 								break;
-                            case DBType.SQLite:
-                                if (primaryKeyName != null)
-                                {
-                                    cmd.CommandText += ";\nSELECT last_insert_rowid();";
-                                    DoPreExecute(cmd);
-                                    id = cmd.ExecuteScalar();
-                                }
-                                else
-                                {
-                                    id = -1;
-                                    DoPreExecute(cmd);
-                                    cmd.ExecuteNonQuery();
-                                }
-                                OnExecutedCommand(cmd);
-                                break;
+							case DBType.SQLite:
+								if (primaryKeyName != null)
+								{
+									cmd.CommandText += ";\nSELECT last_insert_rowid();";
+									DoPreExecute(cmd);
+									id = cmd.ExecuteScalar();
+								}
+								else
+								{
+									id = -1;
+									DoPreExecute(cmd);
+									cmd.ExecuteNonQuery();
+								}
+								OnExecutedCommand(cmd);
+								break;
 							default:
 								cmd.CommandText += ";\nSELECT @@IDENTITY AS NewID;";
 								DoPreExecute(cmd);
@@ -1380,10 +1379,10 @@ namespace Stump.ORM
 					{
 						var sb = new StringBuilder();
 						var index = 0;
-						var pd = PocoData.ForObject(poco,primaryKeyName);
+						var pd = PocoData.ForObject(poco, primaryKeyName);
 
-                        if (poco is ISaveIntercepter)
-                            ( (ISaveIntercepter)poco ).BeforeSave(false);
+						if (poco is ISaveIntercepter)
+							((ISaveIntercepter)poco).BeforeSave(false);
 
 						if (columns == null)
 						{
@@ -1441,7 +1440,7 @@ namespace Stump.ORM
 						DoPreExecute(cmd);
 
 						// Do it
-						var retv=cmd.ExecuteNonQuery();
+						var retv = cmd.ExecuteNonQuery();
 						OnExecutedCommand(cmd);
 						return retv;
 					}
@@ -1510,7 +1509,7 @@ namespace Stump.ORM
 			// If primary key value not specified, pick it up from the object
 			if (primaryKeyValue == null)
 			{
-				var pd = PocoData.ForObject(poco,primaryKeyName);
+				var pd = PocoData.ForObject(poco, primaryKeyName);
 				PocoColumn pc;
 				if (pd.Columns.TryGetValue(primaryKeyName, out pc))
 				{
@@ -1637,11 +1636,11 @@ namespace Stump.ORM
 				cmd.CommandTimeout = OneTimeCommandTimeout;
 				OneTimeCommandTimeout = 0;
 			}
-			else if (CommandTimeout!=0)
+			else if (CommandTimeout != 0)
 			{
 				cmd.CommandTimeout = CommandTimeout;
 			}
-			
+
 			// Call hook
 			OnExecutingCommand(cmd);
 
@@ -1698,10 +1697,10 @@ namespace Stump.ORM
 		}
 		public class ExpandoColumn : PocoColumn
 		{
-			public override void SetValue(object target, object val) { (target as IDictionary<string, object>)[ColumnName]=val; }
-			public override object GetValue(object target) 
-			{ 
-				object val=null;
+			public override void SetValue(object target, object val) { (target as IDictionary<string, object>)[ColumnName] = val; }
+			public override object GetValue(object target)
+			{
+				object val = null;
 				(target as IDictionary<string, object>).TryGetValue(ColumnName, out val);
 				return val;
 			}
@@ -1723,7 +1722,7 @@ namespace Stump.ORM
 					pd.TableInfo.AutoIncrement = true;
 					foreach (var col in (o as IDictionary<string, object>).Keys)
 					{
-						if (col!=primaryKeyName)
+						if (col != primaryKeyName)
 							pd.Columns.Add(col, new ExpandoColumn() { ColumnName = col });
 					}
 					return pd;
@@ -1752,7 +1751,7 @@ namespace Stump.ORM
 					RWLock.ExitReadLock();
 				}
 
-				
+
 				// Cache it
 				RWLock.EnterWriteLock();
 				try
@@ -1781,11 +1780,11 @@ namespace Stump.ORM
 			public PocoData(Type t)
 			{
 				type = t;
-				TableInfo=new TableInfo();
+				TableInfo = new TableInfo();
 
 				// Get the table name
-                var a = t.GetCustomAttributes(typeof(TableNameAttribute), true);
-                TableInfo.TableName = a.Length == 0 ? t.Name : ( a[0] as TableNameAttribute ).TableName;
+				var a = t.GetCustomAttributes(typeof(TableNameAttribute), true);
+				TableInfo.TableName = a.Length == 0 ? t.Name : (a[0] as TableNameAttribute).TableName;
 
 				// Get the primary key
 				TableInfo.PrimaryKey = "ID";
@@ -1799,10 +1798,10 @@ namespace Stump.ORM
 				// Work out bound properties
 				bool explicitColumns = t.GetCustomAttributes(typeof(ExplicitColumnsAttribute), true).Length > 0;
 				Columns = new Dictionary<string, PocoColumn>(StringComparer.OrdinalIgnoreCase);
-                foreach (var pi in t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy))
-                {
-                    if (pi.GetSetMethod() == null)
-                        continue;
+				foreach (var pi in t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy))
+				{
+					if (pi.GetSetMethod() == null)
+						continue;
 
 					// Work out if properties is to be included
 					var colAttrs = pi.GetCustomAttributes(typeof(ColumnAttribute), true);
@@ -1820,15 +1819,15 @@ namespace Stump.ORM
 					var pc = new PocoColumn();
 					pc.PropertyInfo = pi;
 
-                    a = pi.GetCustomAttributes(typeof(PrimaryKeyAttribute), true);
-                    if (a.Length > 0)
-                    {
-                        TableInfo.PrimaryKey = (a[0] as PrimaryKeyAttribute).Name;
-                        TableInfo.SequenceName = (a[0] as PrimaryKeyAttribute).SequenceName;
-                        TableInfo.AutoIncrement = (a[0] as PrimaryKeyAttribute).AutoIncrement;
-                    }
+					a = pi.GetCustomAttributes(typeof(PrimaryKeyAttribute), true);
+					if (a.Length > 0)
+					{
+						TableInfo.PrimaryKey = (a[0] as PrimaryKeyAttribute).Name;
+						TableInfo.SequenceName = (a[0] as PrimaryKeyAttribute).SequenceName;
+						TableInfo.AutoIncrement = (a[0] as PrimaryKeyAttribute).AutoIncrement;
+					}
 
-				    // Work out the DB column name
+					// Work out the DB column name
 					if (colAttrs.Length > 0)
 					{
 						var colattr = (ColumnAttribute)colAttrs[0];
@@ -1895,7 +1894,7 @@ namespace Stump.ORM
 					if (type == typeof(object))
 					{
 						// var poco=new T()
-						il.Emit(OpCodes.Newobj, typeof(System.Dynamic.ExpandoObject).GetConstructor(Type.EmptyTypes));			// obj
+						il.Emit(OpCodes.Newobj, typeof(System.Dynamic.ExpandoObject).GetConstructor(Type.EmptyTypes));          // obj
 
 						MethodInfo fnAdd = typeof(IDictionary<string, object>).GetMethod("Add");
 
@@ -1904,33 +1903,33 @@ namespace Stump.ORM
 						{
 							var srcType = r.GetFieldType(i);
 
-							il.Emit(OpCodes.Dup);						// obj, obj
-							il.Emit(OpCodes.Ldstr, r.GetName(i));		// obj, obj, fieldname
+							il.Emit(OpCodes.Dup);                       // obj, obj
+							il.Emit(OpCodes.Ldstr, r.GetName(i));       // obj, obj, fieldname
 
 							// Get the converter
 							Func<object, object> converter = null;
 							if (Database.Mapper != null)
 								converter = Database.Mapper.GetFromDbConverter(null, srcType);
 							if (ForceDateTimesToUtc && converter == null && srcType == typeof(DateTime))
-								converter = delegate(object src) { return new DateTime(((DateTime)src).Ticks, DateTimeKind.Utc); };
+								converter = delegate (object src) { return new DateTime(((DateTime)src).Ticks, DateTimeKind.Utc); };
 
 							// Setup stack for call to converter
 							AddConverterToStack(il, converter);
 
 							// r[i]
-							il.Emit(OpCodes.Ldarg_0);					// obj, obj, fieldname, converter?,    rdr
-							il.Emit(OpCodes.Ldc_I4, i);					// obj, obj, fieldname, converter?,  rdr,i
-							il.Emit(OpCodes.Callvirt, fnGetValue);		// obj, obj, fieldname, converter?,  value
+							il.Emit(OpCodes.Ldarg_0);                   // obj, obj, fieldname, converter?,    rdr
+							il.Emit(OpCodes.Ldc_I4, i);                 // obj, obj, fieldname, converter?,  rdr,i
+							il.Emit(OpCodes.Callvirt, fnGetValue);      // obj, obj, fieldname, converter?,  value
 
 							// Convert DBNull to null
-							il.Emit(OpCodes.Dup);						// obj, obj, fieldname, converter?,  value, value
-							il.Emit(OpCodes.Isinst, typeof(DBNull));	// obj, obj, fieldname, converter?,  value, (value or null)
+							il.Emit(OpCodes.Dup);                       // obj, obj, fieldname, converter?,  value, value
+							il.Emit(OpCodes.Isinst, typeof(DBNull));    // obj, obj, fieldname, converter?,  value, (value or null)
 							var lblNotNull = il.DefineLabel();
-							il.Emit(OpCodes.Brfalse_S, lblNotNull);		// obj, obj, fieldname, converter?,  value
-							il.Emit(OpCodes.Pop);						// obj, obj, fieldname, converter?
+							il.Emit(OpCodes.Brfalse_S, lblNotNull);     // obj, obj, fieldname, converter?,  value
+							il.Emit(OpCodes.Pop);                       // obj, obj, fieldname, converter?
 							if (converter != null)
-								il.Emit(OpCodes.Pop);					// obj, obj, fieldname, 
-							il.Emit(OpCodes.Ldnull);					// obj, obj, fieldname, null
+								il.Emit(OpCodes.Pop);                   // obj, obj, fieldname, 
+							il.Emit(OpCodes.Ldnull);                    // obj, obj, fieldname, null
 							if (converter != null)
 							{
 								var lblReady = il.DefineLabel();
@@ -1950,120 +1949,120 @@ namespace Stump.ORM
 					else
 #endif
 						if (type.IsValueType || type == typeof(string) || type == typeof(byte[]))
+					{
+						// Do we need to install a converter?
+						var srcType = r.GetFieldType(0);
+						var converter = GetConverter(ForceDateTimesToUtc, null, srcType, type);
+
+						// "if (!rdr.IsDBNull(i))"
+						il.Emit(OpCodes.Ldarg_0);                                       // rdr
+						il.Emit(OpCodes.Ldc_I4_0);                                      // rdr,0
+						il.Emit(OpCodes.Callvirt, fnIsDBNull);                          // bool
+						var lblCont = il.DefineLabel();
+						il.Emit(OpCodes.Brfalse_S, lblCont);
+						il.Emit(OpCodes.Ldnull);                                        // null
+						var lblFin = il.DefineLabel();
+						il.Emit(OpCodes.Br_S, lblFin);
+
+						il.MarkLabel(lblCont);
+
+						// Setup stack for call to converter
+						AddConverterToStack(il, converter);
+
+						il.Emit(OpCodes.Ldarg_0);                                       // rdr
+						il.Emit(OpCodes.Ldc_I4_0);                                      // rdr,0
+						il.Emit(OpCodes.Callvirt, fnGetValue);                          // value
+
+						// Call the converter
+						if (converter != null)
+							il.Emit(OpCodes.Callvirt, fnInvoke);
+
+						il.MarkLabel(lblFin);
+						il.Emit(OpCodes.Unbox_Any, type);                               // value converted
+					}
+					else
+					{
+						// var poco=new T()
+						il.Emit(OpCodes.Newobj, type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
+
+						// Enumerate all fields generating a set assignment for the column
+						for (int i = firstColumn; i < firstColumn + countColumns; i++)
 						{
-							// Do we need to install a converter?
-							var srcType = r.GetFieldType(0);
-							var converter = GetConverter(ForceDateTimesToUtc, null, srcType, type);
+							// Get the PocoColumn for this db column, ignore if not known
+							PocoColumn pc;
+							if (!Columns.TryGetValue(r.GetName(i), out pc))
+								continue;
+
+							// Get the source type for this column
+							var srcType = r.GetFieldType(i);
+							var dstType = pc.PropertyInfo.PropertyType;
 
 							// "if (!rdr.IsDBNull(i))"
-							il.Emit(OpCodes.Ldarg_0);										// rdr
-							il.Emit(OpCodes.Ldc_I4_0);										// rdr,0
-							il.Emit(OpCodes.Callvirt, fnIsDBNull);							// bool
-							var lblCont = il.DefineLabel();
-							il.Emit(OpCodes.Brfalse_S, lblCont);
-							il.Emit(OpCodes.Ldnull);										// null
-							var lblFin = il.DefineLabel();
-							il.Emit(OpCodes.Br_S, lblFin);
+							il.Emit(OpCodes.Ldarg_0);                                       // poco,rdr
+							il.Emit(OpCodes.Ldc_I4, i);                                     // poco,rdr,i
+							il.Emit(OpCodes.Callvirt, fnIsDBNull);                          // poco,bool
+							var lblNext = il.DefineLabel();
+							il.Emit(OpCodes.Brtrue_S, lblNext);                             // poco
 
-							il.MarkLabel(lblCont);
+							il.Emit(OpCodes.Dup);                                           // poco,poco
 
-							// Setup stack for call to converter
-							AddConverterToStack(il, converter);
+							// Do we need to install a converter?
+							var converter = GetConverter(ForceDateTimesToUtc, pc, srcType, dstType);
 
-							il.Emit(OpCodes.Ldarg_0);										// rdr
-							il.Emit(OpCodes.Ldc_I4_0);										// rdr,0
-							il.Emit(OpCodes.Callvirt, fnGetValue);							// value
-
-							// Call the converter
-							if (converter != null)
-								il.Emit(OpCodes.Callvirt, fnInvoke);
-
-							il.MarkLabel(lblFin);
-							il.Emit(OpCodes.Unbox_Any, type);								// value converted
-						}
-						else
-						{
-							// var poco=new T()
-							il.Emit(OpCodes.Newobj, type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
-
-							// Enumerate all fields generating a set assignment for the column
-							for (int i = firstColumn; i < firstColumn + countColumns; i++)
+							// Fast
+							bool Handled = false;
+							if (converter == null)
 							{
-								// Get the PocoColumn for this db column, ignore if not known
-								PocoColumn pc;
-								if (!Columns.TryGetValue(r.GetName(i), out pc))
-									continue;
-
-								// Get the source type for this column
-								var srcType = r.GetFieldType(i);
-								var dstType = pc.PropertyInfo.PropertyType;
-
-								// "if (!rdr.IsDBNull(i))"
-								il.Emit(OpCodes.Ldarg_0);										// poco,rdr
-								il.Emit(OpCodes.Ldc_I4, i);										// poco,rdr,i
-								il.Emit(OpCodes.Callvirt, fnIsDBNull);							// poco,bool
-								var lblNext = il.DefineLabel();
-								il.Emit(OpCodes.Brtrue_S, lblNext);								// poco
-
-								il.Emit(OpCodes.Dup);											// poco,poco
-
-								// Do we need to install a converter?
-								var converter = GetConverter(ForceDateTimesToUtc, pc, srcType, dstType);
-
-								// Fast
-								bool Handled = false;
-								if (converter == null)
+								var valuegetter = typeof(IDataRecord).GetMethod("Get" + srcType.Name, new Type[] { typeof(int) });
+								if (valuegetter != null
+										&& valuegetter.ReturnType == srcType
+										&& (valuegetter.ReturnType == dstType || valuegetter.ReturnType == Nullable.GetUnderlyingType(dstType)))
 								{
-									var valuegetter = typeof(IDataRecord).GetMethod("Get" + srcType.Name, new Type[] { typeof(int) });
-									if (valuegetter != null
-											&& valuegetter.ReturnType == srcType
-											&& (valuegetter.ReturnType == dstType || valuegetter.ReturnType == Nullable.GetUnderlyingType(dstType)))
+									il.Emit(OpCodes.Ldarg_0);                                       // *,rdr
+									il.Emit(OpCodes.Ldc_I4, i);                                     // *,rdr,i
+									il.Emit(OpCodes.Callvirt, valuegetter);                         // *,value
+
+									// Convert to Nullable
+									if (Nullable.GetUnderlyingType(dstType) != null)
 									{
-										il.Emit(OpCodes.Ldarg_0);										// *,rdr
-										il.Emit(OpCodes.Ldc_I4, i);										// *,rdr,i
-										il.Emit(OpCodes.Callvirt, valuegetter);							// *,value
-
-										// Convert to Nullable
-										if (Nullable.GetUnderlyingType(dstType) != null)
-										{
-											il.Emit(OpCodes.Newobj, dstType.GetConstructor(new Type[] { Nullable.GetUnderlyingType(dstType) }));
-										}
-
-										il.Emit(OpCodes.Callvirt, pc.PropertyInfo.GetSetMethod(true));		// poco
-										Handled = true;
+										il.Emit(OpCodes.Newobj, dstType.GetConstructor(new Type[] { Nullable.GetUnderlyingType(dstType) }));
 									}
+
+									il.Emit(OpCodes.Callvirt, pc.PropertyInfo.GetSetMethod(true));      // poco
+									Handled = true;
 								}
-
-								// Not so fast
-								if (!Handled)
-								{
-									// Setup stack for call to converter
-									AddConverterToStack(il, converter);
-
-									// "value = rdr.GetValue(i)"
-									il.Emit(OpCodes.Ldarg_0);										// *,rdr
-									il.Emit(OpCodes.Ldc_I4, i);										// *,rdr,i
-									il.Emit(OpCodes.Callvirt, fnGetValue);							// *,value
-
-									// Call the converter
-									if (converter != null)
-										il.Emit(OpCodes.Callvirt, fnInvoke);
-
-									// Assign it
-									il.Emit(OpCodes.Unbox_Any, pc.PropertyInfo.PropertyType);		// poco,poco,value
-									il.Emit(OpCodes.Callvirt, pc.PropertyInfo.GetSetMethod(true));		// poco
-								}
-
-								il.MarkLabel(lblNext);
 							}
 
-							var fnOnLoaded = RecurseInheritedTypes<MethodInfo>(type, (x) => x.GetMethod("OnLoaded", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
-							if (fnOnLoaded != null)
+							// Not so fast
+							if (!Handled)
 							{
-								il.Emit(OpCodes.Dup);
-								il.Emit(OpCodes.Callvirt, fnOnLoaded);
+								// Setup stack for call to converter
+								AddConverterToStack(il, converter);
+
+								// "value = rdr.GetValue(i)"
+								il.Emit(OpCodes.Ldarg_0);                                       // *,rdr
+								il.Emit(OpCodes.Ldc_I4, i);                                     // *,rdr,i
+								il.Emit(OpCodes.Callvirt, fnGetValue);                          // *,value
+
+								// Call the converter
+								if (converter != null)
+									il.Emit(OpCodes.Callvirt, fnInvoke);
+
+								// Assign it
+								il.Emit(OpCodes.Unbox_Any, pc.PropertyInfo.PropertyType);       // poco,poco,value
+								il.Emit(OpCodes.Callvirt, pc.PropertyInfo.GetSetMethod(true));      // poco
 							}
+
+							il.MarkLabel(lblNext);
 						}
+
+						var fnOnLoaded = RecurseInheritedTypes<MethodInfo>(type, (x) => x.GetMethod("OnLoaded", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
+						if (fnOnLoaded != null)
+						{
+							il.Emit(OpCodes.Dup);
+							il.Emit(OpCodes.Callvirt, fnOnLoaded);
+						}
+					}
 
 					il.Emit(OpCodes.Ret);
 
@@ -2089,7 +2088,7 @@ namespace Stump.ORM
 					// Generate IL to push the converter onto the stack
 					il.Emit(OpCodes.Ldsfld, fldConverters);
 					il.Emit(OpCodes.Ldc_I4, converterIndex);
-					il.Emit(OpCodes.Callvirt, fnListGetItem);					// Converter
+					il.Emit(OpCodes.Callvirt, fnListGetItem);                   // Converter
 				}
 			}
 
@@ -2117,7 +2116,7 @@ namespace Stump.ORM
 				// Standard DateTime->Utc mapper
 				if (forceDateTimesToUtc && converter == null && srcType == typeof(DateTime) && (dstType == typeof(DateTime) || dstType == typeof(DateTime?)))
 				{
-					converter = delegate(object src) { return new DateTime(((DateTime)src).Ticks, DateTimeKind.Utc); };
+					converter = delegate (object src) { return new DateTime(((DateTime)src).Ticks, DateTimeKind.Utc); };
 				}
 
 				// Forced type conversion including integral types -> enum
@@ -2127,17 +2126,17 @@ namespace Stump.ORM
 					{
 						if (srcType != typeof(int))
 						{
-							converter = delegate(object src) { return Convert.ChangeType(src, typeof(int), null); };
+							converter = delegate (object src) { return Convert.ChangeType(src, typeof(int), null); };
 						}
 					}
 					else if (!dstType.IsAssignableFrom(srcType))
 					{
-                        var nullableUnderlyingType = Nullable.GetUnderlyingType(dstType);
+						var nullableUnderlyingType = Nullable.GetUnderlyingType(dstType);
 
-                        if (nullableUnderlyingType != null)
-                            dstType = nullableUnderlyingType;
+						if (nullableUnderlyingType != null)
+							dstType = nullableUnderlyingType;
 
-						converter = delegate(object src) { return Convert.ChangeType(src, dstType, null); };
+						converter = delegate (object src) { return Convert.ChangeType(src, dstType, null); };
 					}
 				}
 				return converter;
