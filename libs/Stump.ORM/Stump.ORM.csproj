@@ -9,6 +9,12 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <PackageReference Include="Mindbox.Data.Linq" Version="5.0.0" />
+	  <PackageReference Include="System.Configuration.ConfigurationManager" Version="6.0.0" />
+	  <PackageReference Include="System.Data.SqlClient" Version="4.8.3" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <ProjectReference Include="..\Stump.Core\Stump.Core.csproj" />
 	</ItemGroup>
 
