@@ -8,4 +8,8 @@
 		<EnablePreviewFeatures>true</EnablePreviewFeatures>
 	</PropertyGroup>
 
+	<ItemGroup>
+	  <ProjectReference Include="..\Stump.Core\Stump.Core.csproj" />
+	</ItemGroup>
+
 </Project>
