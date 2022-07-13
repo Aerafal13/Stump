@@ -16,7 +16,7 @@ namespace Stump.DofusProtocol.Types
 		{
 			Assembly asm = Assembly.GetAssembly(typeof(Version));
 
-			foreach (Type type in asm.GetTypes())
+			foreach (Type type in asm.GetTypes().Where(x => x.Namespace.Contains("Types")))
 			{
 				FieldInfo field = type.GetField("Id");
 
